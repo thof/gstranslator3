@@ -1,0 +1,8 @@
+{
+    "shell-version": ["3.8"], 
+    "uuid": "gstranslator3@thof.github.com", 
+    "name": "GSTranslator3", 
+    "original-author": "thof",
+    "url": "https://github.com/thof/gstranslator2", 
+    "description": "Yet another translator using Google Translate for GNOME Shell"
+}
