@@ -8,7 +8,7 @@ const Extension = imports.misc.extensionUtils.getCurrentExtension();;
 const Lib = Extension.imports.lib;
 const MenuItems = Extension.imports.menu_items;
 
-const schema = "org.gnome.shell.extensions.gstranslator2";
+const schema = "org.gnome.shell.extensions.gstranslator3";
 
 const pretty_names = {
 	'get-translation': 'Get translation',

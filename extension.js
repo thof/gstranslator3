@@ -3,7 +3,7 @@
  * extension.js
  * Copyright (C) 2012-2013 thof <radlewand@gmail.com>
  * 
- * gnome-shell-extension-gstranslator2 is free software: you can redistribute it and/or modify it
+ * gnome-shell-extension-gstranslator3 is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
@@ -35,7 +35,7 @@ const Extension = imports.misc.extensionUtils.getCurrentExtension();
 const Lib = Extension.imports.lib;
 const Trans = Extension.imports.translator;
 
-const schema = "org.gnome.shell.extensions.gstranslator2";
+const schema = "org.gnome.shell.extensions.gstranslator3";
 const BASIC = 0, EXPANDED = 1;
 const PREV = 0, NEXT = 1; 
 
@@ -75,8 +75,7 @@ const Gstranslator = new Lang.Class({
         this.clipboard = St.Clipboard.get_default();
         
         this.gtranslator = new Trans.GoogleTranslator(this.languages_list[this.current_langs][0], 
-                            this.languages_list[this.current_langs][1], this.line_width);
-        
+                            this.languages_list[this.current_langs][1], this.lines_width);
         
         // init menu
         let status_label = new St.Label({ style_class: 'panel-label', text: 'T' });
@@ -96,7 +95,7 @@ const Gstranslator = new Lang.Class({
         this.update_langs_label();
         
         let auto_close = new PopupMenu.PopupSwitchMenuItem("Autoclose", this.auto_close_val);
-        auto_close.connect('toggled', this._change_auto_close);
+        auto_close.connect('toggled', Lang.bind(this, this._change_auto_close));
         
         main_box.add(this.search_entry);
         main_box.add(this.langs_label_menu);
@@ -126,13 +125,14 @@ const Gstranslator = new Lang.Class({
     
     init_settings: function() {
         this.settings = new Lib.Settings(schema).getSettings();
-        
+             
         this.position = parseInt(this.settings.get_string("position"));
         this.xoffset = parseInt(this.settings.get_string("xoffset"));
         this.yoffset = parseInt(this.settings.get_string("yoffset"));
         this.auto_close_val = parseInt(this.settings.get_string("auto-close"));
         this.height = parseInt(this.settings.get_string("height"));
-        this.line_width = parseInt(this.settings.get_string("width"));
+        this.lines_width = [parseInt(this.settings.get_string("width")), 
+                            parseInt(this.settings.get_string("width-wide"))];
         this.load_languages(this.settings.get_string("items"));
         
         for(let key in key_bindings) {
@@ -162,7 +162,7 @@ const Gstranslator = new Lang.Class({
     
     show_trans: function(translation) {
         if (translation != null){
-	        this.translation_label.set_text(translation);
+	        this.translation_label.clutter_text.set_markup(translation);
             this.content.add(this.translation_label);
             this.get_position(this.translation_label);
             this.trans_box.set_x(this.x);
@@ -202,7 +202,6 @@ const Gstranslator = new Lang.Class({
     },
 
     _async_set_trans: function(translation) {
-        //global.log('Translation: '+translation);
         this.show_trans(translation);
         this.prev_translation = translation;
     },
@@ -214,7 +213,7 @@ const Gstranslator = new Lang.Class({
             if (clipboard_content != null && clipboard_content != this.prev_clipboard_content){
                 // when content of clipboard has been changed
                 global.log("GST: Translate from current clipboard /1");
-                this.gtranslator.translate('', mode, Lang.bind(this, this._async_set_trans));
+                this.gtranslator.translate(clipboard_content, mode, Lang.bind(this, this._async_set_trans));
                 this.prev_clipboard_content = clipboard_content;
             } else {
                 // when content of clipboard has not been changed
@@ -238,7 +237,7 @@ const Gstranslator = new Lang.Class({
                 global.log("Diff mode");
                 if (clipboard_content != null && clipboard_content != this.prev_clipboard_content){
                     global.log("GST: Translate from current clipboard /2");
-                    this.gtranslator.translate('', mode, Lang.bind(this, this._async_set_trans));
+                    this.gtranslator.translate(clipboard_content, mode, Lang.bind(this, this._async_set_trans));
                 } else {
                     global.log("GST: Translate from previous clipboard /2");
                     this.gtranslator.translate(this.prev_clipboard_content, mode, Lang.bind(this, this._async_set_trans));
@@ -247,7 +246,7 @@ const Gstranslator = new Lang.Class({
                 global.log("Same mode");
                 if (clipboard_content != null && clipboard_content != this.prev_clipboard_content){
                     global.log("GST: Translate from current clipboard /3");
-                    this.gtranslator.translate('', mode, Lang.bind(this, this._async_set_trans));
+                    this.gtranslator.translate(clipboard_content, mode, Lang.bind(this, this._async_set_trans));
                     this.prev_clipboard_content = clipboard_content;
                 }
             }
@@ -361,7 +360,6 @@ const Gstranslator = new Lang.Class({
             if(text_trans != '') {
                 if(state & state.SHIFT_MASK == state.SHIFT_MASK) {
                     this.get_trans(EXPANDED, text_trans);
-                    //return true;
                 }
                 else {
                     this.get_trans(BASIC, text_trans);
@@ -370,18 +368,21 @@ const Gstranslator = new Lang.Class({
         }
         else if(symbol == Clutter.KEY_Right && state == Clutter.ModifierType.CONTROL_MASK) {
             this.change_langs(NEXT);
-            //return true;
         }
         else if(symbol == Clutter.KEY_Left && state == Clutter.ModifierType.CONTROL_MASK) {
             this.change_langs(PREV);
-            //return true;
         }
-        //return false;
     },
     
     _on_open_state_toggled: function(menu, open) {
         if (open) {
             this.reset_search();
+        }
+    },
+    
+    disable: function() {
+        for(let key in key_bindings) {
+	    	Main.wm.removeKeybinding(key); 
         }
     },
 });
@@ -394,9 +395,7 @@ function enable() {
 }
 
 function disable() {
-    for(key in key_bindings) {
-		Main.wm.removeKeybinding(key); 
-	}
+    gstrans.disable();
     gstrans.destroy();
     gstrans = null;
 }

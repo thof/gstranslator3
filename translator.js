@@ -1,32 +1,10 @@
-/* -*- mode: js2; js2-basic-offset: 4; indent-tabs-mode: nil -*- */
-/*
- * extension.js
- * Copyright (C) 2012-2013 thof <radlewand@gmail.com>
- * 
- * gnome-shell-extension-gstranslator2 is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * gnome-shell-extension-gstranslator2 is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License along
- * with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 const St = imports.gi.St;
 const Lang = imports.lang;
 const Soup = imports.gi.Soup;
 
 const _httpSession = new Soup.SessionAsync();
-Soup.Session.prototype.add_feature.call(
-    _httpSession,
-    new Soup.ProxyResolverDefault()
-);
-_httpSession.user_agent = 'GSTranslator 3';
+Soup.Session.prototype.add_feature.call(_httpSession, new Soup.ProxyResolverDefault());
+_httpSession.user_agent = 'GSTranslator3';
 _httpSession.timeout = 5;
 
 const URL =
@@ -49,15 +27,7 @@ const GoogleTranslator = new Lang.Class({
 
     translate: function(text, mode, callback) {
         this._mode = mode;
-        if(text == '') {
-            // translate from clipboard content
-            this._clipboard.get_text(St.ClipboardType.PRIMARY, Lang.bind(this, Lang.bind(this, function(clipboard, clipboard_content) {
-                this.translate_text(clipboard_content, Lang.bind(this, function(translation){
-                    callback(translation);
-                }));
-            })));
-        } else {
-            // translate from input field
+        if(!this.is_blank(text)){
             this.translate_text(text, Lang.bind(this, function(translation){
                 callback(translation);
             }));
@@ -66,7 +36,6 @@ const GoogleTranslator = new Lang.Class({
     
     translate_text: function(text, callback) {
         let url = this.make_url(this.delete_non_alpa(text));
-        //global.log("Clip text: "+text);
         this._get_data_async(url, Lang.bind(this, function(result) {
             let data = this.parse_response(result);
             callback(data);
@@ -127,10 +96,9 @@ const GoogleTranslator = new Lang.Class({
             orig_string += json.sentences[i].orig;
             trans_string += json.sentences[i].trans;
         }
-        global.log(orig_string);
         
-        if (trans_string.length < this._line_width){
-            trans_string = this.string_divider(orig_string+" - "+trans_string);
+        if (trans_string.length < this._line_width[this._mode]){
+            trans_string = this.string_divider(orig_string+" - <b>"+trans_string+"</b>");
         } else {
             trans_string = this.string_divider(trans_string);
         }
@@ -153,7 +121,7 @@ const GoogleTranslator = new Lang.Class({
         let terms_string = '';
         
         for(let i = 0; i < dict.length; i++) {
-            trans_string += dict[i].pos+"\n";
+            trans_string += "<i>"+dict[i].pos+"</i>\n";
             for(let j = 0; j < dict[i].terms.length; j++){
                 terms_string += dict[i].terms[j] + ", ";
             }
@@ -170,9 +138,9 @@ const GoogleTranslator = new Lang.Class({
         let terms_string = '';
     
         for(let i = 0; i < dict.length; i++) {
-            trans_string += dict[i].pos+"\n";
+            trans_string += "<i>"+dict[i].pos+"</i>\n";
             for(let j = 0; j < dict[i].entry.length; j++){
-                terms_string += dict[i].entry[j].word+" - ";
+                terms_string += "<b>"+dict[i].entry[j].word+"</b> - ";
                 if(dict[i].entry[j].reverse_translation != undefined) {
                     for(let k=0; k < dict[i].entry[j].reverse_translation.length; k++){
                         terms_string += dict[i].entry[j].reverse_translation[k]+", ";
@@ -191,8 +159,8 @@ const GoogleTranslator = new Lang.Class({
     },
     
     string_divider: function(str) {
-        if (str.length>this._line_width) {
-            let p = this._line_width;
+        if (str.length>this._line_width[this._mode]) {
+            let p = this._line_width[this._mode];
             for (;p>0 && str[p]!=' ';p--) { }
             if (p>0) {
                 let left = str.substring(0, p);
@@ -226,5 +194,9 @@ const GoogleTranslator = new Lang.Class({
     set_langs: function(source, target){
         this._source_lang = source;
         this._target_lang = target;
+    },
+    
+    is_blank: function(str) {
+        return (!str || /^\s*$/.test(str));
     },
 });
